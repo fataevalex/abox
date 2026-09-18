@@ -38,7 +38,11 @@ flux-reconcile:
 	@echo "Reconciling RSIP (tag discovery)..."
 	@kubectl annotate resourcesetinputprovider releases-image -n flux-system \
 	  fluxcd.controlplane.io/reconcileAt="$$(date -u +%Y-%m-%dT%H:%M:%SZ)" --overwrite
-	@sleep 3
+	@echo "Waiting for RSIP → ResourceSet propagation..."
+	@sleep 10
+	@kubectl annotate resourceset releases -n flux-system \
+	  fluxcd.controlplane.io/reconcileAt="$$(date -u +%Y-%m-%dT%H:%M:%SZ)" --overwrite
+	@sleep 5
 	@echo "Reconciling Flux sources..."
 	@flux reconcile source oci releases -n flux-system
 	@echo "Reconciling Flux kustomizations..."
