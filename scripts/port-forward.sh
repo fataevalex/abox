@@ -14,13 +14,15 @@ trap cleanup EXIT INT TERM
 echo "Starting port-forwards..."
 echo ""
 
-# agentgateway admin UI (control plane, port 9978)
-kubectl port-forward -n agentgateway-system svc/agentgateway 9978:9978 &
-echo "  agentgateway   → http://localhost:9978"
+# agentgateway admin UI (Envoy admin, port 15000 on the pod)
+kubectl port-forward -n agentgateway-system \
+  "$(kubectl get pod -n agentgateway-system -l gateway.networking.k8s.io/gateway-name=agentgateway-external -o jsonpath='{.items[0].metadata.name}')" \
+  15000:15000 &
+echo "  agentgateway   → http://localhost:15000"
 
-# kagent UI and API — direct, bypassing gateway
-kubectl port-forward -n kagent svc/kagent-ui 8081:8080 &
-echo "  kagent UI      → http://localhost:8081"
+# kagent UI and API
+kubectl port-forward -n kagent svc/kagent-ui 8080:8080 &
+echo "  kagent UI      → http://localhost:8080"
 kubectl port-forward -n kagent svc/kagent-controller 8083:8083 &
 echo "  kagent API     → http://localhost:8083"
 
