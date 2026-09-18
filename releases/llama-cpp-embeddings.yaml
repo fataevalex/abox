@@ -1,0 +1,92 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: llama-cpp
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llama-cpp
+  namespace: llama-cpp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: llama-cpp
+  template:
+    metadata:
+      labels:
+        app: llama-cpp
+    spec:
+      initContainers:
+        - name: model
+          image: ghcr.io/den-vasyliev/abox/nomic-embed:v1.18.1-4ccc0ff
+          command: ["cp", "/model/nomic-embed-text-v1.5.Q4_K_M.gguf", "/mnt/model/"]
+          volumeMounts:
+            - name: model
+              mountPath: /mnt/model
+      containers:
+        - name: llama-cpp
+          image: ghcr.io/ggerganov/llama.cpp:server
+          args:
+            - --model
+            - /mnt/model/nomic-embed-text-v1.5.Q4_K_M.gguf
+            - --port
+            - "8090"
+            - --ctx-size
+            - "8192"
+            - --parallel
+            - "4"
+            - --embeddings
+          ports:
+            - containerPort: 8090
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8090
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 12
+          volumeMounts:
+            - name: model
+              mountPath: /mnt/model
+      volumes:
+        - name: model
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: llama-cpp
+  namespace: llama-cpp
+spec:
+  selector:
+    app: llama-cpp
+  ports:
+    - port: 80
+      targetPort: 8090
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: llama-cpp
+  namespace: llama-cpp
+spec:
+  parentRefs:
+    - name: agentgateway-external
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /llamacpp
+      backendRefs:
+        - name: llama-cpp
+          port: 80
