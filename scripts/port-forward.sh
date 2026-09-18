@@ -30,6 +30,10 @@ echo "  kagent API     → http://localhost:8083"
 kubectl port-forward -n llama-cpp svc/llama-cpp 8090:80 &
 echo "  llama-cpp      → http://localhost:8090/v1/embeddings"
 
+# Ollama embeddings
+kubectl port-forward -n ollama svc/ollama 11434:80 &
+echo "  ollama         → http://localhost:11434/v1/embeddings"
+
 # Arize Phoenix — LLM observability
 kubectl port-forward -n phoenix svc/phoenix-svc 6006:6006 &
 echo "  phoenix        → http://localhost:6006"
