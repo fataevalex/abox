@@ -10,7 +10,7 @@ spec:
     in the cluster (llama-cpp) and locally (docker). Use it to set up or
     troubleshoot the embedding infrastructure.
   declarative:
-    modelConfig: default-model-config
+    modelConfig: gemini-gemini-2-5-flash-lite
     stream: true
     systemMessage: |
       You are an infrastructure agent responsible for the embedding service in
