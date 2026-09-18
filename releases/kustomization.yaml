@@ -10,6 +10,7 @@ resources:
   - llama-cpp-embeddings.yaml
   - ollama.yaml
   - embeddings-route.yaml
+  - agent-embeddings.yaml
 
 patches:
   - path: patches/k8s-agent-sidecar.yaml
