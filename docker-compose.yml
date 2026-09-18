@@ -1,0 +1,5 @@
+services:
+  llama-cpp:
+    image: ghcr.io/den-vasyliev/abox/nomic-embed:v1.18.1-4ccc0ff
+    ports:
+      - "8090:8090"
