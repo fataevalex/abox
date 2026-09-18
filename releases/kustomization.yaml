@@ -18,3 +18,8 @@ patches:
       kind: Deployment
       name: k8s-agent
       namespace: kagent
+  - path: patches/k8s-agent-modelconfig.yaml
+    target:
+      kind: Agent
+      name: k8s-agent
+      namespace: kagent

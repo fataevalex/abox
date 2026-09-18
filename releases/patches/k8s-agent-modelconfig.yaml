@@ -1,0 +1,8 @@
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: k8s-agent
+  namespace: kagent
+spec:
+  declarative:
+    modelConfig: gemini-gemini-2-5-flash-lite
