@@ -14,13 +14,15 @@ trap cleanup EXIT INT TERM
 echo "Starting port-forwards..."
 echo ""
 
-# agentgateway-external — main ingress (kagent UI + API ride through this)
-# All HTTPRoutes go through the agentgateway Gateway on port 80.
+# agentgateway-external — main ingress
 kubectl port-forward -n agentgateway-system svc/agentgateway-external 8080:80 &
-echo "  agentgateway   → http://localhost:8080  (routes all traffic)"
-echo "    kagent UI    → http://localhost:8080/"
-echo "    kagent API   → http://localhost:8080/api"
-echo "  NOTE: open port 8080 in VS Code Ports tab (set visibility to Public)"
+echo "  agentgateway   → http://localhost:8080"
+
+# kagent UI and API — direct, bypassing gateway
+kubectl port-forward -n kagent svc/kagent-ui 8081:8080 &
+echo "  kagent UI      → http://localhost:8081"
+kubectl port-forward -n kagent svc/kagent-controller 8083:8083 &
+echo "  kagent API     → http://localhost:8083"
 
 # Arize Phoenix — LLM observability
 kubectl port-forward -n phoenix svc/phoenix-svc 6006:6006 &
