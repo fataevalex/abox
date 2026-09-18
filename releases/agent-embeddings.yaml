@@ -23,7 +23,8 @@ spec:
       Image: ghcr.io/den-vasyliev/abox/nomic-embed:v1.18.1-4ccc0ff
       The model is baked into the image at /models/model.gguf — no init
       container or volume is needed.
-      Port: 8090. Health: GET /health. Embeddings: POST /v1/embeddings.
+      Service port: 80 (maps to container port 8090). Health: GET /health. Embeddings: POST /v1/embeddings.
+      In-cluster URL: http://llama-cpp.llama-cpp:80
 
       To verify the service is running, ask k8s-agent to:
       - list pods in namespace llama-cpp
@@ -31,7 +32,7 @@ spec:
 
       To test embeddings from inside the cluster, ask k8s-agent to run a
       temporary curl pod and POST to
-      http://llama-cpp-embeddings.llama-cpp:8090/v1/embeddings with body
+      http://llama-cpp.llama-cpp:80/v1/embeddings with body
       {"input":"kubernetes pod","model":"nomic-embed-text-v1.5"}.
 
       Expected response: JSON with data[0].embedding array of 768 floats.
@@ -40,7 +41,8 @@ spec:
 
       Ollama runs in namespace ollama as Deployment/ollama.
       The initContainer pulls nomic-embed-text into emptyDir at /root/.ollama.
-      Port: 11434. Health: GET /api/version. Embeddings: POST /v1/embeddings.
+      Service port: 80 (maps to container port 11434). Health: GET /api/version. Embeddings: POST /v1/embeddings.
+      In-cluster URL: http://ollama.ollama:80
 
       To verify, ask k8s-agent to list pods in namespace ollama and show
       logs of the pull-model init container in deployment ollama.
