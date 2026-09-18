@@ -79,6 +79,24 @@ Cosine similarity **0.998** — обидва рантайми дають пра�
 \* ollama avg включає cold start (1675 ms на першому запиті — модель завантажується в RAM).  
 Без cold start: ollama avg ≈ 99 ms, throughput ≈ 9.5 req/s — порівнянно з llama-cpp.
 
+## Висновки
+
+**llama-cpp переважає** для кластерного deployment:
+- Немає cold start — модель вбудована в образ, pod готовий одразу після старту
+- Стабільна пропускна здатність: 10.35 req/s без деградації
+- Малий footprint — підходить для sidecar-патерну
+
+**Ollama** після прогріву (≈99ms avg без cold start) не поступається llama-cpp, але:
+- Cold start 1675ms при кожному рестарті pod — критично для кластера
+- initContainer тягне модель (~275MB) при кожному рестарті — ненадійно при нестачі диску
+- Оптимальний вибір для локальної розробки де модель залишається закешованою
+
+**Cosine similarity 0.998** — вектори практично ідентичні, тому weighted routing 80/20
+через agentgateway не впливає на якість семантичного пошуку в Qdrant.
+
+**Для production** з high concurrency або GPU — обидва рантайми не підходять:
+потрібен llm-d/vLLM з continuous batching. Це задокументовано в ADR-002.
+
 ## Рішення
 
 Обрано **llama.cpp** як основний runtime для dev та кластерного deployment.  
