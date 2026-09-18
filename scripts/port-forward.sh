@@ -14,9 +14,9 @@ trap cleanup EXIT INT TERM
 echo "Starting port-forwards..."
 echo ""
 
-# agentgateway-external — main ingress
-kubectl port-forward -n agentgateway-system svc/agentgateway-external 8080:80 &
-echo "  agentgateway   → http://localhost:8080"
+# agentgateway admin UI (control plane, port 9978)
+kubectl port-forward -n agentgateway-system svc/agentgateway 9978:9978 &
+echo "  agentgateway   → http://localhost:9978"
 
 # kagent UI and API — direct, bypassing gateway
 kubectl port-forward -n kagent svc/kagent-ui 8081:8080 &
