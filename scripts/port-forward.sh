@@ -14,15 +14,15 @@ trap cleanup EXIT INT TERM
 echo "Starting port-forwards..."
 echo ""
 
-# agentgateway — main ingress (kagent UI + API ride through this)
+# agentgateway-external — main ingress (kagent UI + API ride through this)
 # All HTTPRoutes go through the agentgateway Gateway on port 80.
-kubectl port-forward -n agentgateway-system svc/agentgateway 8080:80 &
+kubectl port-forward -n agentgateway-system svc/agentgateway-external 8080:80 &
 echo "  agentgateway   → http://localhost:8080"
 echo "    kagent UI    → http://localhost:8080/"
 echo "    kagent API   → http://localhost:8080/api"
 
 # Arize Phoenix — LLM observability
-kubectl port-forward -n phoenix svc/phoenix 6006:6006 &
+kubectl port-forward -n phoenix svc/phoenix-svc 6006:6006 &
 echo "  phoenix        → http://localhost:6006"
 
 # Qdrant — vector DB REST API + dashboard
