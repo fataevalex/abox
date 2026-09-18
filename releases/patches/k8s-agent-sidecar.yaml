@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: k8s-agent
+  namespace: kagent
+spec:
+  template:
+    spec:
+      containers:
+        - name: embeddings
+          image: ghcr.io/den-vasyliev/abox/nomic-embed:v1.18.1-4ccc0ff
+          ports:
+            - containerPort: 8090
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8090
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 12
+          volumeMounts:
+            - name: model
+              mountPath: /models
+      volumes:
+        - name: model
+          hostPath:
+            path: /tmp/abox-models
+            type: DirectoryOrCreate

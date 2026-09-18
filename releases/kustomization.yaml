@@ -8,3 +8,10 @@ resources:
   - phoenix.yaml
   - qdrant.yaml
   - llama-cpp-embeddings.yaml
+
+patches:
+  - path: patches/k8s-agent-sidecar.yaml
+    target:
+      kind: Deployment
+      name: k8s-agent
+      namespace: kagent
