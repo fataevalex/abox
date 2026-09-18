@@ -25,15 +25,14 @@ spec:
       container or volume is needed.
       Port: 8090. Health: GET /health. Embeddings: POST /v1/embeddings.
 
-      To verify the service is running:
-        kubectl get pods -n llama-cpp
-        kubectl logs -n llama-cpp deploy/llama-cpp --tail=20
+      To verify the service is running, ask k8s-agent to:
+      - list pods in namespace llama-cpp
+      - show logs of deployment llama-cpp in namespace llama-cpp
 
-      To test embeddings from inside the cluster:
-        kubectl run embed-test --rm -it --image=curlimages/curl -- \
-          curl -s http://llama-cpp-embeddings.llama-cpp:8090/v1/embeddings \
-          -H "Content-Type: application/json" \
-          -d '{"input":"kubernetes pod","model":"nomic-embed-text-v1.5"}'
+      To test embeddings from inside the cluster, ask k8s-agent to run a
+      temporary curl pod and POST to
+      http://llama-cpp-embeddings.llama-cpp:8090/v1/embeddings with body
+      {"input":"kubernetes pod","model":"nomic-embed-text-v1.5"}.
 
       Expected response: JSON with data[0].embedding array of 768 floats.
 
@@ -43,9 +42,8 @@ spec:
       The initContainer pulls nomic-embed-text into emptyDir at /root/.ollama.
       Port: 11434. Health: GET /api/version. Embeddings: POST /v1/embeddings.
 
-      To verify:
-        kubectl get pods -n ollama
-        kubectl logs -n ollama deploy/ollama -c pull-model
+      To verify, ask k8s-agent to list pods in namespace ollama and show
+      logs of the pull-model init container in deployment ollama.
 
       ## Routing (agentgateway)
 
@@ -53,9 +51,8 @@ spec:
       agentgateway-external (namespace agentgateway-system, port 80).
       Weighted: llama-cpp 80%, ollama 20%.
 
-      To check routing status:
-        kubectl get httproute -n embeddings
-        kubectl get pods -n llama-cpp -n ollama
+      To check routing status, ask k8s-agent to list HTTPRoutes in namespace
+      embeddings and pods in namespaces llama-cpp and ollama.
 
       ## Local deployment (docker)
 
@@ -91,18 +88,15 @@ spec:
 
       ## Troubleshooting
 
-      Pod in CrashLoopBackOff:
-        kubectl describe pod -n llama-cpp <pod>
-        kubectl logs -n llama-cpp <pod> --previous
+      Pod in CrashLoopBackOff — ask k8s-agent to describe the failing pod
+      in namespace llama-cpp and show its previous logs.
 
-      Model not loading — check the model path inside the image:
-        kubectl run probe --rm -it --image=ghcr.io/den-vasyliev/abox/nomic-embed:v1.18.1-4ccc0ff \
-          --command -- ls /models
+      Model not loading — ask k8s-agent to run a temporary pod with image
+      ghcr.io/den-vasyliev/abox/nomic-embed:v1.18.1-4ccc0ff and list /models.
 
       Ollama disk pressure — the initContainer writes ~275MB to emptyDir on
-      every pod start. If the node disk is low, delete the ollama deployment
-      and restore llama-cpp only:
-        kubectl delete deployment -n ollama ollama
+      every pod start. If the node disk is low, ask k8s-agent to delete
+      deployment ollama in namespace ollama.
     tools:
       - type: Agent
         agent:
