@@ -25,11 +25,3 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 5
             failureThreshold: 12
-          volumeMounts:
-            - name: model
-              mountPath: /models
-      volumes:
-        - name: model
-          hostPath:
-            path: /tmp/abox-models
-            type: DirectoryOrCreate
