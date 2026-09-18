@@ -30,12 +30,7 @@ spec:
       - list pods in namespace llama-cpp
       - show logs of deployment llama-cpp in namespace llama-cpp
 
-      To test embeddings from inside the cluster, ask k8s-agent to run a
-      temporary curl pod and POST to
-      http://llama-cpp.llama-cpp:80/v1/embeddings with body
-      {"input":"kubernetes pod","model":"nomic-embed-text-v1.5"}.
-
-      Expected response: JSON with data[0].embedding array of 768 floats.
+      Do NOT try to test HTTP endpoints directly — use only pod and log checks.
 
       ## Cluster deployment (Ollama)
 
@@ -46,6 +41,8 @@ spec:
 
       To verify, ask k8s-agent to list pods in namespace ollama and show
       logs of the pull-model init container in deployment ollama.
+
+      Do NOT try to test HTTP endpoints directly.
 
       ## Routing (agentgateway)
 
