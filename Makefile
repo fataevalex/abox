@@ -7,6 +7,8 @@ help:
 	@echo "  tofu       - Initialize OpenTofu"
 	@echo "  apply      - Apply OpenTofu configuration"
 	@echo "  fix-egress - Repair nested-Docker egress (Codespaces) and verify nodes"
+	@echo "  flux-reconcile - Force reconciliation of all Flux sources and kustomizations"
+	@echo "  flux-status    - Show current state of all Flux resources"
 
 run:
 	@bash scripts/setup.sh
@@ -31,6 +33,27 @@ apply:
 
 down:
 	@cd bootstrap && tofu destroy -auto-approve
+
+flux-reconcile:
+	@echo "Reconciling Flux sources..."
+	@flux reconcile source oci releases -n flux-system
+	@echo "Reconciling Flux kustomizations..."
+	@flux reconcile kustomization releases-crds -n flux-system
+	@flux reconcile kustomization releases -n flux-system
+	@echo "Done."
+
+flux-status:
+	@echo "=== OCIRepository ==="
+	@flux get source oci -n flux-system
+	@echo ""
+	@echo "=== Kustomizations ==="
+	@flux get kustomization -n flux-system
+	@echo ""
+	@echo "=== HelmReleases ==="
+	@flux get helmrelease -A
+	@echo ""
+	@echo "=== ResourceSetInputProvider ==="
+	@kubectl get resourcesetinputprovider -n flux-system
 
 push:
 	@git fetch origin --tags --force
