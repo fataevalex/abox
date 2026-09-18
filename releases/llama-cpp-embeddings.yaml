@@ -18,26 +18,9 @@ spec:
       labels:
         app: llama-cpp
     spec:
-      initContainers:
-        - name: model
-          image: ghcr.io/den-vasyliev/abox/nomic-embed:v1.18.1-4ccc0ff
-          command: ["cp", "/models/model.gguf", "/mnt/model/model.gguf"]
-          volumeMounts:
-            - name: model
-              mountPath: /mnt/model
       containers:
         - name: llama-cpp
-          image: ghcr.io/ggerganov/llama.cpp:server
-          args:
-            - --model
-            - /mnt/model/model.gguf
-            - --port
-            - "8090"
-            - --ctx-size
-            - "8192"
-            - --parallel
-            - "4"
-            - --embeddings
+          image: ghcr.io/den-vasyliev/abox/nomic-embed:v1.18.1-4ccc0ff
           ports:
             - containerPort: 8090
           resources:
@@ -54,14 +37,6 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 5
             failureThreshold: 12
-          volumeMounts:
-            - name: model
-              mountPath: /mnt/model
-      volumes:
-        - name: model
-          hostPath:
-            path: /tmp/abox-models
-            type: DirectoryOrCreate
 ---
 apiVersion: v1
 kind: Service
