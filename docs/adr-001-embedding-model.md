@@ -48,14 +48,14 @@
 
 ## Практичне порівняння
 
-Обидва рантайми запущено в кластері з однією моделлю `nomic-embed-text-v1.5`.
-Один і той самий запит надіслано до обох endpoints:
+Оточення: GitHub Codespaces (4 CPU, 8 GB RAM), KinD кластер, CPU-only.  
+Скрипти: `scripts/compare-embeddings.sh`, `scripts/benchmark-embeddings.sh`.
+
+### Якість векторів
 
 ```bash
 bash scripts/compare-embeddings.sh "kubernetes pod crashloopbackoff"
 ```
-
-Результат:
 
 ```
 llama-cpp dimensions : 768
@@ -65,7 +65,19 @@ cosine similarity    : 0.998025
 Vectors are nearly identical (same model weights)
 ```
 
-Cosine similarity **0.998** підтверджує: обидва рантайми дають практично ідентичні вектори для однієї моделі. Різниця незначна і пов'язана з квантизацією.
+Cosine similarity **0.998** — обидва рантайми дають практично ідентичні вектори для однієї моделі.
+
+### Latency та throughput (20 запитів, sequential)
+
+| Метрика        | llama-cpp | ollama          |
+|----------------|-----------|-----------------|
+| avg latency    | 92 ms     | 178 ms *        |
+| throughput     | 10.35 req/s | 5.53 req/s    |
+| cold start     | —         | 1675 ms (req #1)|
+| errors         | 0/20      | 0/20            |
+
+\* ollama avg включає cold start (1675 ms на першому запиті — модель завантажується в RAM).  
+Без cold start: ollama avg ≈ 99 ms, throughput ≈ 9.5 req/s — порівнянно з llama-cpp.
 
 ## Рішення
 
