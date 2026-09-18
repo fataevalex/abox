@@ -89,8 +89,8 @@ spec:
         enabled: true
         exporter:
           otlp:
-            endpoint: "http://phoenix-svc.phoenix:6006"
-            protocol: "http/protobuf"
+            endpoint: "http://phoenix-svc.phoenix:4317"
+            protocol: "grpc"
             insecure: true
     providers:
       default: gemini
