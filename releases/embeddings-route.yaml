@@ -1,0 +1,58 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: embeddings
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: embeddings
+  namespace: embeddings
+spec:
+  parentRefs:
+    - name: agentgateway-external
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: Exact
+            value: /v1/embeddings
+      backendRefs:
+        - name: llama-cpp
+          namespace: llama-cpp
+          port: 80
+          weight: 80
+        - name: ollama
+          namespace: ollama
+          port: 80
+          weight: 20
+---
+# Allow HTTPRoute in embeddings namespace to reference llama-cpp service
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: embeddings-route
+  namespace: llama-cpp
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: embeddings
+  to:
+    - group: ""
+      kind: Service
+---
+# Allow HTTPRoute in embeddings namespace to reference ollama service
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: embeddings-route
+  namespace: ollama
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: embeddings
+  to:
+    - group: ""
+      kind: Service
