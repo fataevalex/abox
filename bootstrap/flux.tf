@@ -49,7 +49,7 @@ resource "kubectl_manifest" "rsip" {
         # 0.8.9 and a cluster bootstrapped from main runs that branch's
         # bundle. Widen this again once those tags are gone from the registry
         # and main cuts its next release.
-        includeTag: "^0\\.6\\.5$"
+        includeTag: "^\\d+\\.\\d+\\.\\d+$"
         limit: 1
       defaultValues:
         tag: "${var.releases_version}"
