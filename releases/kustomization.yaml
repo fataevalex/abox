@@ -11,6 +11,10 @@ resources:
   - ollama.yaml
   - embeddings-route.yaml
   - agent-embeddings.yaml
+  - llmd.yaml
+  - mcp-servers.yaml
+  - agent-retrieval.yaml
+  - neo4j.yaml
 
 patches:
   - path: patches/k8s-agent-sidecar.yaml
