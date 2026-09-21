@@ -59,7 +59,7 @@ spec:
       #
       # chat returns 501 against either: both are started with --embeddings and
       # have no generation head.
-      EMBEDDINGS_BASE_URL: http://llama-cpp.llama-cpp:80
+      EMBEDDINGS_BASE_URL: http://llama-cpp-embeddings.llama-cpp:8090
       # vector_store / vector_find embed through the same endpoint, so the
       # agent's memory lands in the vector space the gateway serves. The
       # collection is named for that space. llm-d serves the same model at Q8_0
