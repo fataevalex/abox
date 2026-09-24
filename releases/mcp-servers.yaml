@@ -88,6 +88,7 @@ spec:
     # Official qdrant MCP server wrapped in our image (mcp/qdrant-mcp-official).
     # Uses fastembed in-process for embeddings — needs more memory than the Go server.
     image: ghcr.io/fataevalex/abox/qdrant-mcp-official:0.1.0
+    cmd: mcp-server-qdrant
     env:
       QDRANT_URL: http://qdrant.qdrant:6333
       COLLECTION_NAME: abox-miniLM

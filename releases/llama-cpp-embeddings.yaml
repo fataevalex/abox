@@ -41,13 +41,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: llama-cpp
+  name: llama-cpp-embeddings
   namespace: llama-cpp
 spec:
   selector:
     app: llama-cpp
   ports:
-    - port: 80
+    - port: 8090
       targetPort: 8090
 ---
 apiVersion: gateway.networking.k8s.io/v1
@@ -65,5 +65,5 @@ spec:
             type: PathPrefix
             value: /llamacpp
       backendRefs:
-        - name: llama-cpp
-          port: 80
+        - name: llama-cpp-embeddings
+          port: 8090

@@ -18,9 +18,9 @@ spec:
             type: Exact
             value: /v1/embeddings
       backendRefs:
-        - name: llama-cpp
+        - name: llama-cpp-embeddings
           namespace: llama-cpp
-          port: 80
+          port: 8090
           weight: 80
         - name: ollama
           namespace: ollama

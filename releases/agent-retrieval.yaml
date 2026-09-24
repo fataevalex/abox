@@ -28,9 +28,12 @@ spec:
 
       ## Ingest
 
-      Manifests come from the k8s-agent delegate. Ask it for the YAML of the
-      objects you were told to ingest; it is the only tool here that can read
-      the cluster.
+      Manifests come from the k8s-agent delegate. It is the only tool here
+      that can read the cluster. When delegating, always ask explicitly:
+      "get resource YAML for <kind> <name> in namespace <namespace>".
+      Ask for one object at a time. Never ask for a list -- lists return
+      summaries, not YAML. Retrieve the full YAML of every object before
+      calling any store or graph tool.
 
       Ingest declared objects, not the ones a controller generated from them.
       For kagent that means the custom resources -- kagent.dev Agent,
