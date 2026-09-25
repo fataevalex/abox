@@ -6,6 +6,7 @@ help:
 	@echo "  tools      - Install necessary tools only"
 	@echo "  tofu       - Initialize OpenTofu"
 	@echo "  apply      - Apply OpenTofu configuration"
+	@echo "  move-docker-to-tmp - Move Docker data-root to /tmp (Codespaces disk space)"
 	@echo "  fix-docker-acl - Fix /tmp Docker ACL before first make run (Codespaces)"
 	@echo "  fix-egress - Repair nested-Docker egress (Codespaces) and verify nodes"
 	@echo "  flux-reconcile - Force reconciliation of all Flux sources and kustomizations"
@@ -21,6 +22,12 @@ tools:
 	  OS=$$(uname -s | tr '[:upper:]' '[:lower:]'); \
 	  curl -fsSLo /tmp/kind "https://kind.sigs.k8s.io/dl/v0.33.0/kind-$$OS-$$ARCH" && \
 	  sudo install -m 0755 /tmp/kind /usr/local/bin/kind && rm -f /tmp/kind
+
+move-docker-to-tmp:
+	# Move Docker data-root from /var/lib/docker to /tmp/docker.
+	# /tmp is a larger ext4 volume in Codespaces; / fills up quickly with kind.
+	# Run once per Codespace, before make run. Safe to re-run (no-ops if done).
+	@bash scripts/move-docker-to-tmp.sh
 
 fix-docker-acl:
 	# Run this once in a fresh Codespace before make run.
