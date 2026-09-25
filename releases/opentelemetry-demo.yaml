@@ -80,6 +80,28 @@ spec:
             value: "false"
         service:
           port: 8089
+      # Switch the AI agent from OpenAI to Gemini via its OpenAI-compatible
+      # endpoint. LLM_BASE_URL points at Google's OpenAI-compat API; LLM_MODEL
+      # uses the litellm "gemini/" prefix the agent's LangGraph code expects.
+      # API_KEY is pulled from the same Secret kagent uses so there's only one
+      # place to rotate the key.
+      # USE_VCR=False disables the cassette playback that masks live LLM calls
+      # (the default True replays pre-recorded responses, hiding real traces).
+      agent:
+        envOverrides:
+          - name: LLM_BASE_URL
+            value: "https://generativelanguage.googleapis.com/v1beta/openai/"
+          - name: LLM_MODEL
+            value: "gemini/gemini-2.5-flash-lite"
+          - name: LLM_TLS_VERIFY
+            value: "True"
+          - name: USE_VCR
+            value: "False"
+          - name: API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: gemini-api-key
+                key: GEMINI_API_KEY
     # Bundled jaeger/prometheus/grafana/opensearch backends disabled --
     # frees ~1.7Gi mem + 1+ CPU on a constrained KinD node: jaeger alone
     # requested 600Mi, prometheus 768Mi, opensearch 1 CPU/100Mi, grafana

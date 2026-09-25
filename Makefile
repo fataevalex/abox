@@ -38,6 +38,10 @@ secrets:
 	  -n kagent \
 	  --from-literal="GEMINI_API_KEY=$$GEMINI_API_KEY" \
 	  --dry-run=client -o yaml | kubectl apply -f -
+	@kubectl create secret generic gemini-api-key \
+	  -n otel-demo \
+	  --from-literal="GEMINI_API_KEY=$$GEMINI_API_KEY" \
+	  --dry-run=client -o yaml | kubectl apply -f -
 	@echo "Waiting for Phoenix to be ready..."
 	@kubectl wait --for=condition=available deployment/phoenix -n phoenix --timeout=120s
 	@echo "Generating Phoenix API key..."
