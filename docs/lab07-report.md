@@ -144,8 +144,21 @@ experiment tracking і кореляції трейсів з model runs.
 | otel-demo chatbot 500 | OpenAI key відсутній | Переключено на Gemini (`LLM_BASE_URL` + `LLM_MODEL` override, `USE_VCR=False`) |
 | Gemini 404 з `gemini/` prefix | litellm routing syntax ≠ model name | Прибрано prefix: `gemini-2.5-flash-lite` |
 | kagent API 404 на `/api/sessions/{id}/runs` | kagent використовує A2A JSON-RPC, не REST runs | `POST /api/a2a/{ns}/{name}` з `method: message/send` |
+| MLflow ngrok "Invalid Host header" | DNS-rebinding guard блокує ngrok Host | Додано `*.ngrok-free.dev` в `allowed-hosts` (fnmatch wildcard) |
 
 ---
+
+## Публічний доступ (ngrok)
+
+MLflow UI доступний публічно через ngrok free tier:
+
+```bash
+make ngrok-mlflow   # встановлює ngrok якщо потрібно, запускає тунель
+```
+
+MLflow's DNS-rebinding guard (`fastapi_security`) налаштований з wildcard
+`*.ngrok-free.dev` — автоматично приймає будь-який ngrok free-tier URL без
+зміни конфігурації при кожному перезапуску тунелю.
 
 ## Посилання
 
