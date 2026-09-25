@@ -6,6 +6,7 @@ help:
 	@echo "  tools      - Install necessary tools only"
 	@echo "  tofu       - Initialize OpenTofu"
 	@echo "  apply      - Apply OpenTofu configuration"
+	@echo "  secrets    - Create all required cluster secrets (GEMINI_API_KEY, PHOENIX_API_KEY)"
 	@echo "  move-docker-to-tmp - Move Docker data-root to /tmp (Codespaces disk space)"
 	@echo "  fix-docker-acl - Fix /tmp Docker ACL before first make run (Codespaces)"
 	@echo "  fix-egress - Repair nested-Docker egress (Codespaces) and verify nodes"
@@ -22,6 +23,23 @@ tools:
 	  OS=$$(uname -s | tr '[:upper:]' '[:lower:]'); \
 	  curl -fsSLo /tmp/kind "https://kind.sigs.k8s.io/dl/v0.33.0/kind-$$OS-$$ARCH" && \
 	  sudo install -m 0755 /tmp/kind /usr/local/bin/kind && rm -f /tmp/kind
+
+secrets:
+	# Create all secrets the cluster needs. Run once after make run.
+	# Required env vars:
+	#   GEMINI_API_KEY  - Google Gemini API key for kagent
+	#   PHOENIX_API_KEY - Arize Phoenix API key (create in Phoenix UI → Settings)
+	@[ -n "$$GEMINI_API_KEY" ] || (echo "ERROR: GEMINI_API_KEY is not set" && exit 1)
+	@[ -n "$$PHOENIX_API_KEY" ] || (echo "ERROR: PHOENIX_API_KEY is not set" && exit 1)
+	@kubectl create secret generic gemini-gemini-2-5-flash-lite \
+	  -n kagent \
+	  --from-literal="GEMINI_API_KEY=$$GEMINI_API_KEY" \
+	  --dry-run=client -o yaml | kubectl apply -f -
+	@kubectl create secret generic phoenix-api-key \
+	  -n mlflow \
+	  --from-literal="api-key=$$PHOENIX_API_KEY" \
+	  --dry-run=client -o yaml | kubectl apply -f -
+	@echo "Secrets applied."
 
 move-docker-to-tmp:
 	# Move Docker data-root from /var/lib/docker to /tmp/docker.

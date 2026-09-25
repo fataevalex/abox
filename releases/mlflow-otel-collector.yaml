@@ -45,6 +45,15 @@ spec:
   values:
     mode: deployment
     fullnameOverride: otel-collector
+    # Inject the Phoenix API key from a k8s Secret so it never lands in
+    # the ConfigMap. The OTel collector expands ${env:PHOENIX_API_KEY} at
+    # startup before the config is parsed.
+    extraEnvs:
+      - name: PHOENIX_API_KEY
+        valueFrom:
+          secretKeyRef:
+            name: phoenix-api-key
+            key: api-key
     # The chart dropped its implicit image default in this version -- must be
     # explicit or the render fails outright.
     image:
@@ -87,13 +96,19 @@ spec:
             insecure: true
           headers:
             x-mlflow-experiment-id: "2"
-        # Phoenix receives OTLP/gRPC on :6006 (collector port, not the web UI).
-        # Parallel export: same spans go to both MLflow and Phoenix so the two
-        # UIs can be compared side by side without switching kagent's endpoint.
+        # Phoenix receives OTLP/gRPC on :4317 (6006 is the web UI).
+        # Parallel export: same spans land in both MLflow and Phoenix so the
+        # two UIs can be compared side by side.
+        # API key lives in k8s Secret "phoenix-api-key" (namespace mlflow),
+        # injected as PHOENIX_API_KEY via extraEnvs below. The ${env:} syntax
+        # is the OTel collector's own secret-expansion mechanism -- the value
+        # never appears in the ConfigMap rendered by the chart.
         otlp/phoenix:
-          endpoint: phoenix-svc.phoenix.svc.cluster.local:6006
+          endpoint: phoenix-svc.phoenix.svc.cluster.local:4317
           tls:
             insecure: true
+          headers:
+            authorization: "Bearer ${env:PHOENIX_API_KEY}"
       # jaeger/zipkin removed outright, not just dropped from the traces
       # pipeline below -- the collector refuses to start with a receiver
       # defined but not referenced by any pipeline.
