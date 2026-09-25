@@ -45,6 +45,8 @@ secrets:
 	@echo "Waiting for Phoenix to be ready..."
 	@kubectl wait --for=condition=available deployment/phoenix -n phoenix --timeout=120s
 	@echo "Generating Phoenix API key..."
+	@# Kill any stale port-forward on 16006 from a previous run before binding.
+	@fuser -k 16006/tcp 2>/dev/null || true
 	@# Use port 16006 to avoid conflict with the main port-forward on 6006.
 	@kubectl port-forward -n phoenix svc/phoenix-svc 16006:6006 &>/dev/null & \
 	  PF_PID=$$!; \
