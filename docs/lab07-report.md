@@ -70,10 +70,10 @@ otel-demo DaemonSet ──►┘               ──gRPC──► Phoenix
 
 Два MLflow experiments з живими трейсами:
 
-| Experiment | Джерело | Трейсів (зразок) |
+| Experiment | Джерело | Трейсів |
 |---|---|---|
-| `otel-demo` (ID 1) | frontend-proxy, checkout, payment та ін. | безперервно від load generator |
-| `kagent` (ID 2) | kagent-controller | 5 трейсів від k8s-agent запиту |
+| `otel-demo` (ID 1) | frontend-proxy, checkout, payment, fraud-detection та ін. | безперервно від load generator |
+| `kagent` (ID 2) | kagent-controller | підтверджено через A2A API виклик |
 
 Трейси містять повний k8s контекст: `k8s.namespace.name`, `k8s.pod.name`,
 `k8s.deployment.name`, `k8s.cluster.uid`, `container.image.tag`.
@@ -82,16 +82,42 @@ otel-demo DaemonSet ──►┘               ──gRPC──► Phoenix
 навантаженням otel-demo (~25 сервісів) → liveness probe timeout.
 Вирішено збільшенням `failureThreshold` з 5 до 10 (100s tolerance).
 
+### OTel Demo Chatbot (Astronomy Shop)
+
+Chatbot переключено з OpenAI на Gemini через OpenAI-compatible endpoint
+(`https://generativelanguage.googleapis.com/v1beta/openai/`). Chatbot
+відповідає на запити про телескопи, будує кошик, виконує тулкол
+`GET /api/products`. API key з Secret `gemini-api-key` (namespace `otel-demo`).
+
+Обмеження: `agent` компонент не використовує OTel LLM instrumentation —
+Gemini виклики відображаються як звичайні HTTP spans без `gen_ai.*` атрибутів.
+
 ### Phoenix
 
 | Метрика | Значення |
 |---|---|
 | Проект | `default` |
-| Трейсів | 2368 (otel-demo + kagent) |
-| Auth | Bearer JWT (auto-generated) |
+| Трейсів | 28777+ (otel-demo + kagent) |
+| Auth | Bearer JWT (auto-generated via `make secrets`) |
 
-Phoenix відображає LLM спани значно зручніше за MLflow: prompt/response
-як читабельний текст замість raw JSON атрибутів.
+Phoenix отримує всі трейси через fan-out в otel-collector. Span viewer
+зручніший за MLflow для аналізу розподілених трейсів. LLM-специфічні
+атрибути (`gen_ai.*`) відсутні в поточних джерелах — для повноцінного
+LLM observability потрібна OTel GenAI instrumentation в агентах.
+
+### kagent A2A API
+
+Підтверджено програмний виклик k8s-agent через A2A JSON-RPC:
+
+```bash
+POST /api/a2a/kagent/k8s-agent
+{"jsonrpc":"2.0","id":1,"method":"message/send","params":{
+  "message":{"messageId":"...","role":"user",
+    "parts":[{"kind":"text","text":"list all pods in mlflow namespace"}],
+    "contextId":"<session-id>"}}}
+```
+
+Агент відповів переліком подів, трейс зафіксовано в MLflow experiment `kagent`.
 
 ### ADR-004
 
@@ -113,8 +139,11 @@ experiment tracking і кореляції трейсів з model runs.
 | MLflow `/v1/traces` 404 | Experiments не створені | `POST /api/2.0/mlflow/experiments/create` до старту трафіку |
 | curl на :5000 → AirTunes | macOS AirPlay Receiver займає порт 5000 | MLflow port-forward на :5001 |
 | Phoenix 401 на OTLP | Auth обов'язковий навіть при `auth.enabled: false` | GraphQL API key + Bearer header в collector |
-| `make secrets` port conflict на :6006 | port-forward скрипт вже тримає порт | Тимчасовий форвард на :16006 |
+| `make secrets` port conflict на :6006 | port-forward скрипт вже тримає порт | Тимчасовий форвард на :16006, `fuser -k` перед bind |
 | MLflow liveness probe timeout | SQLite блокує uvicorn event loop | failureThreshold: 5→10 |
+| otel-demo chatbot 500 | OpenAI key відсутній | Переключено на Gemini (`LLM_BASE_URL` + `LLM_MODEL` override, `USE_VCR=False`) |
+| Gemini 404 з `gemini/` prefix | litellm routing syntax ≠ model name | Прибрано prefix: `gemini-2.5-flash-lite` |
+| kagent API 404 на `/api/sessions/{id}/runs` | kagent використовує A2A JSON-RPC, не REST runs | `POST /api/a2a/{ns}/{name}` з `method: message/send` |
 
 ---
 

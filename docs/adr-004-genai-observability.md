@@ -6,7 +6,8 @@ Lab07 розгортає три o11y рішення паралельно для 
 з точки зору GenAI спостережуваності:
 
 - **OpenTelemetry Demo (Astronomy Shop)** — еталонний мікросервісний застосунок
-  від OTel проекту з вбудованим AI агентом (`agent` компонент на базі OpenAI)
+  від OTel проекту з вбудованим AI агентом (`agent` компонент, переключений на
+  Gemini через OpenAI-compatible endpoint)
 - **MLflow Tracing** — ML-платформа з підтримкою OTLP ingestion (з v3.x),
   фокус на ML experiments і model lifecycle
 - **Arize Phoenix** — спеціалізований LLM observability інструмент,
@@ -66,9 +67,12 @@ MLflow v3.x додав OTLP ingestion і Traces UI поверх своєї ML-п
 | GenAI focus | ⚠️ вторинна фіча поверх ML платформи |
 | Стабільність під навантаженням | ⚠️ SQLite блокує uvicorn event loop при >25 сервісах |
 
-**Спостереження з кластеру**: kagent-controller трейси (5 шт.) надійшли з
-правильними k8s атрибутами. otel-demo трейси (frontend-proxy) містять повний
-k8s контекст: pod, replicaset, deployment, node, cluster.uid.
+**Спостереження з кластеру**: kagent-controller трейси надійшли з правильними
+k8s атрибутами. otel-demo трейси (frontend-proxy та інші ~25 сервісів) містять
+повний k8s контекст: pod, replicaset, deployment, node, cluster.uid.
+
+kagent API (A2A JSON-RPC `message/send`) успішно викликаний програмно — агент
+відповів про поди в mlflow namespace, трейси з'явились в experiment `kagent`.
 
 MLflow зручний якщо вже використовується для ML-експериментів — трейси
 інтегруються в той самий UI де живуть runs і моделі.
@@ -89,9 +93,15 @@ Phoenix — спеціалізований LLM observability інструмен�
 | Ресурси | ✅ легший ніж MLflow-full (немає torch/sklearn) |
 | GenAI focus | ✅ основне призначення |
 
-**Спостереження з кластеру**: Phoenix отримав 2368 трейсів (otel-demo + kagent)
+**Спостереження з кластеру**: Phoenix отримав 28777 трейсів (otel-demo + kagent)
 в єдиний проект `default`. UI значно зручніший для аналізу LLM спанів —
 prompt/response відображаються як читабельний текст, а не raw JSON атрибути.
+
+Зауваження: otel-demo `agent` компонент використовує httpx для виклику Gemini
+без OTel LLM instrumentation — LLM спани не мають `gen_ai.*` атрибутів, тому
+Phoenix не виділяє їх як LLM. kagent-controller генерує власні OTel спани через
+свій SDK, але вони також приходять як `spanKind=unknown` в Phoenix — потребує
+додаткового налаштування OpenInference/OpenTelemetry GenAI SDK в самому kagent.
 
 ## Порівняльна таблиця
 
