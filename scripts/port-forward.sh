@@ -35,8 +35,9 @@ kubectl port-forward -n ollama svc/ollama 11434:80 &
 echo "  ollama         → http://localhost:11434/v1/embeddings"
 
 # MLflow — experiment tracking + LLM tracing (lab07)
-kubectl port-forward -n mlflow svc/mlflow-mlflow 5000:5000 &
-echo "  mlflow         → http://localhost:5000"
+# Port 5000 is used by macOS AirPlay Receiver, so map to 5001 locally.
+kubectl port-forward -n mlflow svc/mlflow-mlflow 5001:5000 &
+echo "  mlflow         → http://localhost:5001"
 
 # OTel Demo — Astronomy Shop frontend (lab07)
 kubectl port-forward -n otel-demo svc/frontend-proxy 8081:8080 &
