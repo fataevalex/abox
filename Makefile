@@ -10,6 +10,7 @@ help:
 	@echo "  move-docker-to-tmp - Move Docker data-root to /tmp (Codespaces disk space)"
 	@echo "  fix-docker-acl - Fix /tmp Docker ACL before first make run (Codespaces)"
 	@echo "  fix-egress - Repair nested-Docker egress (Codespaces) and verify nodes"
+	@echo "  ngrok-mlflow   - Expose MLflow UI publicly via ngrok (free tier)"
 	@echo "  flux-reconcile - Force reconciliation of all Flux sources and kustomizations"
 	@echo "  flux-status    - Show current state of all Flux resources"
 
@@ -69,6 +70,22 @@ secrets:
 	    --from-literal="api-key=$$PHOENIX_JWT" \
 	    --dry-run=client -o yaml | kubectl apply -f -
 	@echo "Secrets applied."
+
+ngrok-mlflow:
+	# Expose MLflow UI publicly via ngrok free tier (auto-assigned URL).
+	# Requires: ngrok installed and authenticated (ngrok config add-authtoken <token>).
+	# Ensures the MLflow port-forward is running before starting the tunnel.
+	@if ! command -v ngrok >/dev/null 2>&1; then \
+	  echo "Installing ngrok..."; \
+	  curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null; \
+	  echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list >/dev/null; \
+	  sudo apt-get update -qq && sudo apt-get install -y -qq ngrok; \
+	fi
+	@# Ensure port-forward to MLflow is alive. Port 5001 avoids macOS AirPlay on :5000.
+	@fuser 5001/tcp >/dev/null 2>&1 || kubectl port-forward -n mlflow svc/mlflow-mlflow 5001:5000 &>/dev/null &
+	@sleep 2
+	@echo "Starting ngrok tunnel for MLflow on :5001..."
+	@ngrok http 5001
 
 move-docker-to-tmp:
 	# Move Docker data-root from /var/lib/docker to /tmp/docker.
