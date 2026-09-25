@@ -6,6 +6,7 @@ help:
 	@echo "  tools      - Install necessary tools only"
 	@echo "  tofu       - Initialize OpenTofu"
 	@echo "  apply      - Apply OpenTofu configuration"
+	@echo "  fix-docker-acl - Fix /tmp Docker ACL before first make run (Codespaces)"
 	@echo "  fix-egress - Repair nested-Docker egress (Codespaces) and verify nodes"
 	@echo "  flux-reconcile - Force reconciliation of all Flux sources and kustomizations"
 	@echo "  flux-status    - Show current state of all Flux resources"
@@ -20,6 +21,12 @@ tools:
 	  OS=$$(uname -s | tr '[:upper:]' '[:lower:]'); \
 	  curl -fsSLo /tmp/kind "https://kind.sigs.k8s.io/dl/v0.33.0/kind-$$OS-$$ARCH" && \
 	  sudo install -m 0755 /tmp/kind /usr/local/bin/kind && rm -f /tmp/kind
+
+fix-docker-acl:
+	# Run this once in a fresh Codespace before make run.
+	# /tmp carries a default ACL that strips o+x from unpacked container layers,
+	# causing non-root pods to fail at exec (Permission denied on binaries).
+	@bash scripts/fix-docker-acl.sh
 
 fix-egress:
 	@bash scripts/fix-egress.sh
