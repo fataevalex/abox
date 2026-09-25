@@ -43,8 +43,22 @@ if ! sudo -n true 2>/dev/null; then
 fi
 
 # ── stop Docker ───────────────────────────────────────────────────────────────
+# Codespaces runs dockerd as a plain background process -- no systemd, no
+# service manager. systemctl and service both print warnings and exit 1 here,
+# so fall through to a direct pkill. The socket disappears once the pid exits.
 log "stopping Docker..."
-sudo systemctl stop docker docker.socket 2>/dev/null || sudo service docker stop
+if sudo systemctl stop docker docker.socket 2>/dev/null; then
+  log "stopped via systemctl"
+elif sudo service docker stop 2>/dev/null; then
+  log "stopped via service"
+else
+  sudo pkill -x dockerd 2>/dev/null || true
+  for i in $(seq 1 10); do
+    [[ ! -S /var/run/docker.sock ]] && break
+    sleep 1
+  done
+  log "stopped via pkill"
+fi
 
 # ── write daemon.json ─────────────────────────────────────────────────────────
 # Merge with existing config if present so we don't lose other settings
@@ -83,10 +97,22 @@ fi
 
 # ── start Docker ──────────────────────────────────────────────────────────────
 log "starting Docker..."
-sudo systemctl start docker 2>/dev/null || sudo service docker start
+if sudo systemctl start docker 2>/dev/null; then
+  log "started via systemctl"
+elif sudo service docker start 2>/dev/null; then
+  log "started via service"
+else
+  # Codespaces: launch dockerd directly in the background. stdout/stderr go to
+  # /tmp/dockerd.log so we can inspect it if the verify step fails.
+  sudo dockerd --data-root="${TARGET}" > /tmp/dockerd.log 2>&1 &
+  log "started via direct dockerd (pid $!); logs at /tmp/dockerd.log"
+fi
 
-# give the daemon a moment to write its socket
-sleep 2
+# Wait for the socket to appear (up to 15 s).
+for i in $(seq 1 15); do
+  [[ -S /var/run/docker.sock ]] && break
+  sleep 1
+done
 
 # ── verify ────────────────────────────────────────────────────────────────────
 new_root=$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || true)
