@@ -40,13 +40,16 @@ spec:
                 value: 5
               - op: replace
                 path: /spec/template/spec/containers/0/livenessProbe/failureThreshold
-                value: 5
+                # 10 misses × 10s period = 100s of tolerance before kill.
+                # SQLite write under otel-demo's ~25 services can block the
+                # uvicorn event loop for several seconds; 5 was too tight.
+                value: 10
               - op: replace
                 path: /spec/template/spec/containers/0/readinessProbe/timeoutSeconds
                 value: 5
               - op: replace
                 path: /spec/template/spec/containers/0/readinessProbe/failureThreshold
-                value: 5
+                value: 10
             target:
               kind: Deployment
               labelSelector: app.kubernetes.io/name=mlflow
