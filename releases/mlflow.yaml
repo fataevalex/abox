@@ -94,7 +94,10 @@ spec:
       # "Rejected request with invalid Host header: mlflow-mlflow.mlflow.
       # svc.cluster.local:5000" after adding the bare hostname alone.
       value_options:
-        allowed-hosts: "mlflow-mlflow.mlflow.svc.cluster.local,mlflow-mlflow.mlflow.svc.cluster.local:*,localhost,localhost:*,127.0.0.1,127.0.0.1:*"
+        # *.ngrok-free.dev covers the auto-assigned ngrok free-tier URL which
+        # changes on every tunnel restart. MLflow's is_allowed_host_header uses
+        # fnmatch when the pattern contains '*', so this matches any subdomain.
+        allowed-hosts: "mlflow-mlflow.mlflow.svc.cluster.local,mlflow-mlflow.mlflow.svc.cluster.local:*,localhost,localhost:*,127.0.0.1,127.0.0.1:*,*.ngrok-free.dev,*.ngrok-free.dev:*"
         # `mlflow server --workers=N` is a bare `uvicorn --workers N
         # mlflow.server.fastapi_app:app` underneath (confirmed live via
         # /proc/*/cmdline -- no gunicorn, no worker-class layer). Each
