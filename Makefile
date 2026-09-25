@@ -41,22 +41,23 @@ secrets:
 	@echo "Waiting for Phoenix to be ready..."
 	@kubectl wait --for=condition=available deployment/phoenix -n phoenix --timeout=120s
 	@echo "Generating Phoenix API key..."
-	@kubectl port-forward -n phoenix svc/phoenix-svc 6006:6006 &>/dev/null & \
+	@# Use port 16006 to avoid conflict with the main port-forward on 6006.
+	@kubectl port-forward -n phoenix svc/phoenix-svc 16006:6006 &>/dev/null & \
 	  PF_PID=$$!; \
 	  sleep 3; \
-	  ACCESS_TOKEN=$$(curl -s -X POST http://localhost:6006/auth/login \
+	  ACCESS_TOKEN=$$(curl -s -X POST http://localhost:16006/auth/login \
 	    -H "Content-Type: application/json" \
 	    -d '{"email":"admin@localhost","password":"root"}' \
-	    -c /tmp/phoenix-cookies.txt -b /tmp/phoenix-cookies.txt \
 	    -D - 2>/dev/null \
 	    | grep -i 'set-cookie: phoenix-access-token' \
 	    | sed 's/.*phoenix-access-token=\([^;]*\).*/\1/' | tr -d '\r'); \
-	  PHOENIX_JWT=$$(curl -s -X POST http://localhost:6006/graphql \
+	  PHOENIX_JWT=$$(curl -s -X POST http://localhost:16006/graphql \
 	    -H "Content-Type: application/json" \
 	    -H "Cookie: phoenix-access-token=$$ACCESS_TOKEN" \
 	    -d '{"query":"mutation { createUserApiKey(input: {name: \"otel-collector\", expiresAt: null}) { jwt } }"}' \
 	    | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['createUserApiKey']['jwt'])"); \
 	  kill $$PF_PID 2>/dev/null; \
+	  [ -n "$$PHOENIX_JWT" ] || (echo "ERROR: failed to get Phoenix JWT -- check Phoenix logs" && exit 1); \
 	  kubectl create secret generic phoenix-api-key \
 	    -n mlflow \
 	    --from-literal="api-key=$$PHOENIX_JWT" \
