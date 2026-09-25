@@ -27,18 +27,40 @@ tools:
 secrets:
 	# Create all secrets the cluster needs. Run once after make run.
 	# Required env vars:
-	#   GEMINI_API_KEY  - Google Gemini API key for kagent
-	#   PHOENIX_API_KEY - Arize Phoenix API key (create in Phoenix UI → Settings)
+	#   GEMINI_API_KEY - Google Gemini API key for kagent
+	#
+	# Phoenix API key is generated automatically: the target port-forwards
+	# to Phoenix, logs in as admin@localhost/root, calls createUserApiKey
+	# via GraphQL, and stores the returned JWT in the phoenix-api-key Secret.
+	# No manual token management needed across Codespace recreations.
 	@[ -n "$$GEMINI_API_KEY" ] || (echo "ERROR: GEMINI_API_KEY is not set" && exit 1)
-	@[ -n "$$PHOENIX_API_KEY" ] || (echo "ERROR: PHOENIX_API_KEY is not set" && exit 1)
 	@kubectl create secret generic gemini-gemini-2-5-flash-lite \
 	  -n kagent \
 	  --from-literal="GEMINI_API_KEY=$$GEMINI_API_KEY" \
 	  --dry-run=client -o yaml | kubectl apply -f -
-	@kubectl create secret generic phoenix-api-key \
-	  -n mlflow \
-	  --from-literal="api-key=$$PHOENIX_API_KEY" \
-	  --dry-run=client -o yaml | kubectl apply -f -
+	@echo "Waiting for Phoenix to be ready..."
+	@kubectl wait --for=condition=available deployment/phoenix -n phoenix --timeout=120s
+	@echo "Generating Phoenix API key..."
+	@kubectl port-forward -n phoenix svc/phoenix-svc 6006:6006 &>/dev/null & \
+	  PF_PID=$$!; \
+	  sleep 3; \
+	  ACCESS_TOKEN=$$(curl -s -X POST http://localhost:6006/auth/login \
+	    -H "Content-Type: application/json" \
+	    -d '{"email":"admin@localhost","password":"root"}' \
+	    -c /tmp/phoenix-cookies.txt -b /tmp/phoenix-cookies.txt \
+	    -D - 2>/dev/null \
+	    | grep -i 'set-cookie: phoenix-access-token' \
+	    | sed 's/.*phoenix-access-token=\([^;]*\).*/\1/' | tr -d '\r'); \
+	  PHOENIX_JWT=$$(curl -s -X POST http://localhost:6006/graphql \
+	    -H "Content-Type: application/json" \
+	    -H "Cookie: phoenix-access-token=$$ACCESS_TOKEN" \
+	    -d '{"query":"mutation { createUserApiKey(input: {name: \"otel-collector\", expiresAt: null}) { jwt } }"}' \
+	    | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['createUserApiKey']['jwt'])"); \
+	  kill $$PF_PID 2>/dev/null; \
+	  kubectl create secret generic phoenix-api-key \
+	    -n mlflow \
+	    --from-literal="api-key=$$PHOENIX_JWT" \
+	    --dry-run=client -o yaml | kubectl apply -f -
 	@echo "Secrets applied."
 
 move-docker-to-tmp:
