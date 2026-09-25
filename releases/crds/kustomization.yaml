@@ -6,4 +6,3 @@ resources:
   - agentgateway-crds.yaml
   - kagent-crds.yaml
   - inference-extension-crds.yaml
-  - ngrok-operator.yaml

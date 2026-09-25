@@ -18,7 +18,6 @@ resources:
   - opentelemetry-demo.yaml
   - mlflow.yaml
   - mlflow-otel-collector.yaml
-  - ngrok-operator.yaml
 
 patches:
   - path: patches/k8s-agent-sidecar.yaml
