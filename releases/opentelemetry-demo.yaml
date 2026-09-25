@@ -1,0 +1,140 @@
+# OpenTelemetry Demo -- https://opentelemetry.io/docs/demo/kubernetes-deployment/
+#
+# The reference microservices app the OTel project ships to exercise traces,
+# metrics and logs end to end. Chart bundles its own backends as subcharts
+# (jaeger, prometheus, grafana, opensearch) -- all `enabled: true` by default.
+#
+# HTTP Helm repo, like qdrant/neo4j/llm-d -- the chart is not published to an
+# OCI registry, so this is chart.spec + HelmRepository, not chartRef.
+#
+# Not wired onto agentgateway-external. frontend-proxy (the chart's single
+# envoy entrypoint, fronting the web UI, jaeger UI, grafana and flagd UI) is
+# built to own the root path -- kagent.yaml already claims "/" on that
+# listener for its own UI, and frontend-proxy's Next.js frontend and the
+# jaeger/grafana subpaths behind it are not written to tolerate being
+# reachable under a further prefix (a gateway URLRewrite only rewrites the
+# inbound request path, not the absolute asset paths the frontend serves).
+# Its routing is baked into the frontend-proxy image itself too -- there is
+# no envoy config in this chart to add a path to even for in-cluster access.
+# Access is via the docs' own default instead (Service names are the bare
+# component name here, not release-prefixed):
+#
+#   kubectl port-forward -n otel-demo svc/frontend-proxy 8080:8080
+#
+# then http://localhost:8080/ for the web store, /chatbot/, /jaeger/ui/,
+# /grafana/, /telemetry/, /feature/ -- the exact list the chart's own
+# post-install NOTES.txt prints. No /loadgen: the chart's default
+# component.load-generator.env pins LOCUST_HEADLESS: "true", unlike
+# docker-compose's LOCUST_HEADLESS=false, so upstream's screenshots of a
+# Locust UI are docker-compose-only unless overridden. Overridden here via
+# envOverrides (merged onto the chart's env by name, not a wholesale
+# replacement -- see the chart's otel-demo.envOverriden helper) plus a
+# service.port so the chart renders a Service at all (load-generator gets
+# none by default: no .service block, no .ports). Locust's own default web
+# port is 8089, unset here same as upstream, so the two line up:
+#
+#   kubectl port-forward -n otel-demo svc/load-generator 8089:8089
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: otel-demo
+  # Scopes this namespace into the triage agent (cluster mode) as tenant
+  # otel-demo. Declared here because the releases Kustomization prunes
+  # annotations added by hand on its next reconcile.
+  annotations:
+    triageagent.dev/tenant: otel-demo
+    triageagent.dev/virtual-app-identity: workload
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: open-telemetry
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: https://open-telemetry.github.io/opentelemetry-helm-charts
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: opentelemetry-demo
+  namespace: otel-demo
+spec:
+  interval: 1h
+  releaseName: opentelemetry-demo
+  chart:
+    spec:
+      chart: opentelemetry-demo
+      version: "0.41.2"
+      sourceRef:
+        kind: HelmRepository
+        name: open-telemetry
+        namespace: flux-system
+  install:
+    createNamespace: true
+  values:
+    components:
+      load-generator:
+        envOverrides:
+          - name: LOCUST_HEADLESS
+            value: "false"
+        service:
+          port: 8089
+    # Bundled jaeger/prometheus/grafana/opensearch backends disabled --
+    # frees ~1.7Gi mem + 1+ CPU on a constrained KinD node: jaeger alone
+    # requested 600Mi, prometheus 768Mi, opensearch 1 CPU/100Mi, grafana
+    # 150m/256Mi. Traces additionally consolidate into mlflow
+    # (releases/mlflow.yaml) via the bridge collector
+    # (releases/mlflow-otel-collector.yaml), same as triage-core.
+    jaeger:
+      enabled: false
+    prometheus:
+      enabled: false
+    grafana:
+      enabled: false
+    opensearch:
+      enabled: false
+    opentelemetry-collector:
+      config:
+        exporters:
+          # The chart's default otlp_grpc/jaeger, otlp_http/prometheus and
+          # opensearch exporters are deliberately left wired to their
+          # original (now-backendless) endpoints rather than nulled out.
+          # This chart nests them 3 levels deep -- umbrella chart's own
+          # values.yaml sets the concrete defaults for the opentelemetry-
+          # collector *subchart's* config, so a HelmRelease-level `key:
+          # null` override has to survive being coalesced through that
+          # extra layer. It doesn't in this cluster's Helm: verified live
+          # via `helm get manifest` that the null literally lands in the
+          # rendered ConfigMap (`otlp_grpc/jaeger: null`) instead of
+          # deleting the key -- unlike a plain `helm template` locally,
+          # and unlike mlflow-otel-collector.yaml's receivers.jaeger/
+          # receivers.zipkin nulls, which delete fine because that chart
+          # is installed flat (one level, no umbrella/subchart layering).
+          # A null landing as a literal fails the exporter's own field
+          # validation at startup ("endpoint must be specified") -- a
+          # harder failure than the "defined but unused" case this was
+          # trying to avoid. Dropping them from the pipeline below instead
+          # (definition intact, reference removed) hits that unused-
+          # component startup failure. So: leave both definition and
+          # pipeline reference as upstream default -- they just log
+          # harmless connection errors now that jaeger/prometheus/
+          # opensearch are gone. Same bridge triage-core sends through,
+          # same protocol (gRPC) this chart's other otlp_grpc/* exporters
+          # already use for in-cluster targets.
+          otlp_grpc/mlflow-bridge:
+            endpoint: otel-collector.mlflow.svc.cluster.local:4317
+            tls:
+              insecure: true
+        service:
+          pipelines:
+            # metrics/logs pipelines are left untouched (chart defaults:
+            # otlp_http/prometheus+debug / opensearch+debug) -- only traces
+            # additionally routes to mlflow, matching mlflow-otel-
+            # collector.yaml's traces-only OTLP ingestion.
+            traces:
+              exporters:
+                - otlp_grpc/jaeger
+                - debug
+                - span_metrics
+                - otlp_grpc/mlflow-bridge

@@ -1,0 +1,126 @@
+# Bridges triage-core's and otel-demo's OTel traces into MLflow Tracing.
+# triage-core's own exporter only speaks OTLP/gRPC (releases/triage-core.yaml's
+# otelTracing comment: "grpc is the only protocol the exporter build
+# supports"), and MLflow's tracking server only accepts OTLP/HTTP at
+# POST /v1/traces -- gRPC ingestion isn't implemented (confirmed against
+# mlflow.org/docs/latest/genai/tracing/opentelemetry/ingest/, 2026-09-21).
+# Pointing either source straight at mlflow-mlflow:5000 is therefore a dead
+# end; this collector receives gRPC on :4317 (same protocol/port triage-core
+# already targets on phoenix-svc, and what releases/opentelemetry-demo.yaml's
+# own collector re-exports to) and re-exports over OTLP/HTTP with the
+# x-mlflow-experiment-id header MLflow requires to route spans into an
+# experiment.
+#
+# One shared receiver, split into each source's own experiment by the
+# routing connector -- otherwise both land in whichever experiment ID the
+# single exporter's header names, no per-source separation. Deliberately no
+# default_pipelines/catch-all bucket: only these two sources exist today, and
+# a third source landing here unrouted should surface as a visibly dropped
+# span (a "dropped" debug log), not silently join one of the two experiments
+# it isn't from. triage-core is matched on service.name ("triage-core", set
+# by releases/triage-core.yaml's otelTracing.serviceName -- it sends directly
+# to this collector with no k8s_attributes enrichment in front of it).
+# otel-demo is matched on k8s.namespace.name ("otel-demo") instead, since its
+# own collector (releases/opentelemetry-demo.yaml) already injects that via
+# its own k8s_attributes preset before forwarding here, and its span
+# service.name values are the individual microservices (frontend, checkout,
+# ...), not "otel-demo" itself.
+#
+# Experiment IDs are assigned by mlflow at creation time, not deterministic --
+# these were created once via POST /api/2.0/mlflow/experiments/create (name:
+# "triage-core" -> "2", name: "otel-demo" -> "3") and hardcoded below. Redo
+# that call and update these if the mlflow-mlflow PVC is ever wiped (a fresh
+# backend store re-creates "Default" as "0" but not these).
+#
+# Reuses the open-telemetry HelmRepository releases/opentelemetry-demo.yaml
+# already declares in flux-system rather than redeclaring it.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: otel-collector
+  namespace: mlflow
+spec:
+  interval: 1h
+  releaseName: otel-collector
+  chart:
+    spec:
+      chart: opentelemetry-collector
+      version: "0.173.1"
+      sourceRef:
+        kind: HelmRepository
+        name: open-telemetry
+        namespace: flux-system
+  install:
+    createNamespace: true
+  values:
+    mode: deployment
+    fullnameOverride: otel-collector
+    # The chart dropped its implicit image default in this version -- must be
+    # explicit or the render fails outright.
+    image:
+      repository: otel/opentelemetry-collector-contrib
+    # Jaeger/Zipkin ingestion ports are chart defaults, enabled regardless of
+    # whether those receivers exist in config. Disabled to match the trimmed
+    # receiver set below instead of listening on dead ports.
+    ports:
+      jaeger-compact:
+        enabled: false
+      jaeger-thrift:
+        enabled: false
+      jaeger-grpc:
+        enabled: false
+      zipkin:
+        enabled: false
+    config:
+      connectors:
+        # No match_once/default_pipelines -- see the file header comment for
+        # why there's deliberately no catch-all bucket here.
+        routing:
+          table:
+            - statement: route() where resource.attributes["service.name"] == "triage-core"
+              pipelines: [traces/triage-core]
+            - statement: route() where resource.attributes["k8s.namespace.name"] == "otel-demo"
+              pipelines: [traces/otel-demo]
+      exporters:
+        # otlp_http, not otlphttp -- the chart's rewriteDeprecatedComponentNames
+        # (on by default) silently renames the old identifier at render time;
+        # writing the current one directly skips that rewrite and its warning.
+        otlp_http/mlflow-triage-core:
+          endpoint: http://mlflow-mlflow.mlflow.svc.cluster.local:5000
+          tls:
+            insecure: true
+          headers:
+            x-mlflow-experiment-id: "2"
+        otlp_http/mlflow-otel-demo:
+          endpoint: http://mlflow-mlflow.mlflow.svc.cluster.local:5000
+          tls:
+            insecure: true
+          headers:
+            x-mlflow-experiment-id: "3"
+      # jaeger/zipkin removed outright, not just dropped from the traces
+      # pipeline below -- the collector refuses to start with a receiver
+      # defined but not referenced by any pipeline.
+      receivers:
+        jaeger: null
+        zipkin: null
+      service:
+        pipelines:
+          traces:
+            receivers:
+              - otlp
+            exporters:
+              # debug logs every received span once, pre-routing, to the
+              # pod's stdout -- useful to confirm traces are arriving at all
+              # before checking which experiment they landed in.
+              - debug
+              - routing
+          traces/triage-core:
+            receivers:
+              - routing
+            exporters:
+              - otlp_http/mlflow-triage-core
+          traces/otel-demo:
+            receivers:
+              - routing
+            exporters:
+              - otlp_http/mlflow-otel-demo
