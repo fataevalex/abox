@@ -26,13 +26,21 @@ echo "  kagent UI      → http://localhost:8080"
 kubectl port-forward -n kagent svc/kagent-controller 8083:8083 &
 echo "  kagent API     → http://localhost:8083"
 
-# llama-cpp embeddings
-kubectl port-forward -n llama-cpp svc/llama-cpp 8090:80 &
+# llama-cpp embeddings (service renamed to llama-cpp-embeddings in lab04)
+kubectl port-forward -n llama-cpp svc/llama-cpp-embeddings 8090:8090 &
 echo "  llama-cpp      → http://localhost:8090/v1/embeddings"
 
 # Ollama embeddings
 kubectl port-forward -n ollama svc/ollama 11434:80 &
 echo "  ollama         → http://localhost:11434/v1/embeddings"
+
+# MLflow — experiment tracking + LLM tracing (lab07)
+kubectl port-forward -n mlflow svc/mlflow-mlflow 5000:5000 &
+echo "  mlflow         → http://localhost:5000"
+
+# OTel Demo — Astronomy Shop frontend (lab07)
+kubectl port-forward -n otel-demo svc/frontend-proxy 8081:8080 &
+echo "  otel-demo      → http://localhost:8081"
 
 # Arize Phoenix — LLM observability
 kubectl port-forward -n phoenix svc/phoenix-svc 6006:6006 &
