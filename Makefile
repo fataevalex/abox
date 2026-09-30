@@ -6,7 +6,11 @@ help:
 	@echo "  tools      - Install necessary tools only"
 	@echo "  tofu       - Initialize OpenTofu"
 	@echo "  apply      - Apply OpenTofu configuration"
+	@echo "  secrets    - Create all required cluster secrets (GEMINI_API_KEY, PHOENIX_API_KEY)"
+	@echo "  move-docker-to-tmp - Move Docker data-root to /tmp (Codespaces disk space)"
+	@echo "  fix-docker-acl - Fix /tmp Docker ACL before first make run (Codespaces)"
 	@echo "  fix-egress - Repair nested-Docker egress (Codespaces) and verify nodes"
+	@echo "  ngrok-mlflow   - Expose MLflow UI publicly via ngrok (free tier)"
 	@echo "  flux-reconcile - Force reconciliation of all Flux sources and kustomizations"
 	@echo "  flux-status    - Show current state of all Flux resources"
 
@@ -20,6 +24,80 @@ tools:
 	  OS=$$(uname -s | tr '[:upper:]' '[:lower:]'); \
 	  curl -fsSLo /tmp/kind "https://kind.sigs.k8s.io/dl/v0.33.0/kind-$$OS-$$ARCH" && \
 	  sudo install -m 0755 /tmp/kind /usr/local/bin/kind && rm -f /tmp/kind
+
+secrets:
+	# Create all secrets the cluster needs. Run once after make run.
+	# Required env vars:
+	#   GEMINI_API_KEY - Google Gemini API key for kagent
+	#
+	# Phoenix API key is generated automatically: the target port-forwards
+	# to Phoenix, logs in as admin@localhost/root, calls createUserApiKey
+	# via GraphQL, and stores the returned JWT in the phoenix-api-key Secret.
+	# No manual token management needed across Codespace recreations.
+	@[ -n "$$GEMINI_API_KEY" ] || (echo "ERROR: GEMINI_API_KEY is not set" && exit 1)
+	@kubectl create secret generic gemini-gemini-2-5-flash-lite \
+	  -n kagent \
+	  --from-literal="GEMINI_API_KEY=$$GEMINI_API_KEY" \
+	  --dry-run=client -o yaml | kubectl apply -f -
+	@kubectl create secret generic gemini-api-key \
+	  -n otel-demo \
+	  --from-literal="GEMINI_API_KEY=$$GEMINI_API_KEY" \
+	  --dry-run=client -o yaml | kubectl apply -f -
+	@echo "Waiting for Phoenix to be ready..."
+	@kubectl wait --for=condition=available deployment/phoenix -n phoenix --timeout=120s
+	@echo "Generating Phoenix API key..."
+	@# Kill any stale port-forward on 16006 from a previous run before binding.
+	@fuser -k 16006/tcp 2>/dev/null || true
+	@# Use port 16006 to avoid conflict with the main port-forward on 6006.
+	@kubectl port-forward -n phoenix svc/phoenix-svc 16006:6006 &>/dev/null & \
+	  PF_PID=$$!; \
+	  sleep 3; \
+	  ACCESS_TOKEN=$$(curl -s -X POST http://localhost:16006/auth/login \
+	    -H "Content-Type: application/json" \
+	    -d '{"email":"admin@localhost","password":"root"}' \
+	    -D - 2>/dev/null \
+	    | grep -i 'set-cookie: phoenix-access-token' \
+	    | sed 's/.*phoenix-access-token=\([^;]*\).*/\1/' | tr -d '\r'); \
+	  PHOENIX_JWT=$$(curl -s -X POST http://localhost:16006/graphql \
+	    -H "Content-Type: application/json" \
+	    -H "Cookie: phoenix-access-token=$$ACCESS_TOKEN" \
+	    -d '{"query":"mutation { createUserApiKey(input: {name: \"otel-collector\", expiresAt: null}) { jwt } }"}' \
+	    | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['createUserApiKey']['jwt'])"); \
+	  kill $$PF_PID 2>/dev/null; \
+	  [ -n "$$PHOENIX_JWT" ] || (echo "ERROR: failed to get Phoenix JWT -- check Phoenix logs" && exit 1); \
+	  kubectl create secret generic phoenix-api-key \
+	    -n mlflow \
+	    --from-literal="api-key=$$PHOENIX_JWT" \
+	    --dry-run=client -o yaml | kubectl apply -f -
+	@echo "Secrets applied."
+
+ngrok-mlflow:
+	# Expose MLflow UI publicly via ngrok free tier (auto-assigned URL).
+	# Requires: ngrok installed and authenticated (ngrok config add-authtoken <token>).
+	# Ensures the MLflow port-forward is running before starting the tunnel.
+	@if ! command -v ngrok >/dev/null 2>&1; then \
+	  echo "Installing ngrok..."; \
+	  curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null; \
+	  echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list >/dev/null; \
+	  sudo apt-get update -qq && sudo apt-get install -y -qq ngrok; \
+	fi
+	@# Ensure port-forward to MLflow is alive. Port 5001 avoids macOS AirPlay on :5000.
+	@fuser 5001/tcp >/dev/null 2>&1 || kubectl port-forward -n mlflow svc/mlflow-mlflow 5001:5000 &>/dev/null &
+	@sleep 2
+	@echo "Starting ngrok tunnel for MLflow on :5001..."
+	@ngrok http 5001
+
+move-docker-to-tmp:
+	# Move Docker data-root from /var/lib/docker to /tmp/docker.
+	# /tmp is a larger ext4 volume in Codespaces; / fills up quickly with kind.
+	# Run once per Codespace, before make run. Safe to re-run (no-ops if done).
+	@bash scripts/move-docker-to-tmp.sh
+
+fix-docker-acl:
+	# Run this once in a fresh Codespace before make run.
+	# /tmp carries a default ACL that strips o+x from unpacked container layers,
+	# causing non-root pods to fail at exec (Permission denied on binaries).
+	@bash scripts/fix-docker-acl.sh
 
 fix-egress:
 	@bash scripts/fix-egress.sh

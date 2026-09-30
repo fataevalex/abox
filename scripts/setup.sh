@@ -59,6 +59,12 @@ alias tf=tofu
 alias k=kubectl
 EOF
 
+# Move Docker data-root to /tmp before the cluster is created so that image
+# layers unpack into the larger ext4 volume rather than the 32G / overlay.
+# No-ops if data-root is already /tmp/docker.
+log "Checking Docker data-root location..."
+bash "${SCRIPT_DIR}/move-docker-to-tmp.sh"
+
 # Repair nested-Docker egress before anything tries to pull an image. See
 # scripts/fix-egress.sh for why Codespaces needs this.
 log "Checking Docker egress..."

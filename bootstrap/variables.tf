@@ -18,7 +18,7 @@ variable "releases_artifact" {
   # any branch would win and a cluster bootstrapped from main would get that
   # branch's bundle. .github/workflows/flux-push.yaml derives the name per
   # branch; a feature branch sets this to match.
-  default = "releases-lab04"
+  default = "releases-lab07"
 }
 
 variable "releases_version" {

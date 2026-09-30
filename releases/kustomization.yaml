@@ -15,6 +15,9 @@ resources:
   - mcp-servers.yaml
   - agent-retrieval.yaml
   - neo4j.yaml
+  - opentelemetry-demo.yaml
+  - mlflow.yaml
+  - mlflow-otel-collector.yaml
 
 patches:
   - path: patches/k8s-agent-sidecar.yaml

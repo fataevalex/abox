@@ -89,7 +89,11 @@ spec:
         enabled: true
         exporter:
           otlp:
-            endpoint: "http://phoenix-svc.phoenix:4317"
+            # mlflow-otel-collector receives gRPC on :4317 and bridges to
+            # MLflow's OTLP/HTTP. Spans are routed by k8s.namespace.name=kagent
+            # into the "kagent" experiment (ID 2). Phoenix also receives on
+            # :4317 -- swap back to phoenix-svc.phoenix:4317 to compare.
+            endpoint: "http://otel-collector.mlflow:4317"
             protocol: "grpc"
             insecure: true
     providers:
